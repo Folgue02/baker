@@ -9,6 +9,11 @@
         "issues": "https://github.com/laravel-zero/laravel-zero/issues",
         "source": "https://github.com/laravel-zero/laravel-zero"
     },
+    "scripts": {
+        "test": [
+            "php vendor/bin/phpunit tests"
+        ]
+    },
     "authors": [
         {
             "name": "Folgue02",
@@ -23,7 +28,7 @@
     "require-dev": {
         "laravel/pint": "^1.25.1",
         "mockery/mockery": "^1.6.12",
-        "pestphp/pest": "^3.8.4|^4.1.2"
+        "phpunit/phpunit": "^12.5"
     },
     "autoload": {
         "psr-4": {
@@ -34,16 +39,13 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "App\\": "tests/"
         }
     },
     "config": {
         "preferred-install": "dist",
         "sort-packages": true,
-        "optimize-autoloader": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true
-        }
+        "optimize-autoloader": true
     },
     "minimum-stability": "stable",
     "prefer-stable": true,

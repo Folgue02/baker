@@ -16,7 +16,7 @@ final class StrUtilities
 
     public static function joinPaths(string $basePath, string ...$segments): string
     {
-        $basePath = str_replace('\\', '/', $basePath);
+        $basePath = rtrim(str_replace('\\', '/', $basePath), '/');
         $segments = array_map(fn($seg) => trim(str_replace('\\', '/', $seg), '/'), $segments);
 
         return join('/', [$basePath, ...$segments]);
@@ -28,18 +28,17 @@ final class StrUtilities
         $path = str_replace('\\', '/', $path);
 
         // Join cwd and the specified path (if its not absolute)
-        if (str_starts_with($path, '/'))
+        if (!str_starts_with($path, '/'))
             $path = self::joinPaths($cwd, $path);
 
-
         // Resolve '..' and '.'
-        $segments = array_filter(explode($path, '/'), fn($seg) => trim($seg) !== '');
+        $segments = array_filter(explode('/', $path), fn($seg) => trim($seg) !== '');
         $resolvedSegments = [];
 
         foreach ($segments as $segment) {
             if ($segment === '..')
                 array_pop($resolvedSegments);
-            else if ($segment == '.')
+            else if ($segment === '.')
                 continue;
             else
                 $resolvedSegments[] = $segment;
