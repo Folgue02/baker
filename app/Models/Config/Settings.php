@@ -18,6 +18,6 @@ final class Settings
         $filename = pathinfo($path, PATHINFO_FILENAME);
         $extension = pathinfo($path, PATHINFO_EXTENSION);
 
-        return $dirname . '/' . $filename . date($this->backupSuffix) . '.' . $extension;
+        return $dirname . '/' . $filename . date($this->backupSuffix) . ($extension ? '.' . $extension : '');
     }
 }

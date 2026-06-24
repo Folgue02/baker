@@ -21,4 +21,30 @@ final class StrUtilities
 
         return join('/', [$basePath, ...$segments]);
     }
+
+    public static function canonicalPath(string $path, ?string $cwd = null): string
+    {
+        $cwd ??= getcwd();
+        $path = str_replace('\\', '/', $path);
+
+        // Join cwd and the specified path (if its not absolute)
+        if (str_starts_with($path, '/'))
+            $path = self::joinPaths($cwd, $path);
+
+
+        // Resolve '..' and '.'
+        $segments = array_filter(explode($path, '/'), fn($seg) => trim($seg) !== '');
+        $resolvedSegments = [];
+
+        foreach ($segments as $segment) {
+            if ($segment === '..')
+                array_pop($resolvedSegments);
+            else if ($segment == '.')
+                continue;
+            else
+                $resolvedSegments[] = $segment;
+        }
+
+        return '/' . implode('/', $resolvedSegments);
+    }
 }
