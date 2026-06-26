@@ -7,21 +7,19 @@ trait HasCreatedAt
 {
     public ?string $createdAt;
 
-    public function setCreatedAt(string|DateTime|null $createdAt)
+    public function setCreatedAt(?string $createdAt)
     {
-        $timestampFormat = config('baker.timestamp_format');
-        if ($createdAt instanceof DateTime)
-            $this->createdAt = $createdAt->format($timestampFormat);
-        else if (is_string($createdAt)) {
-            $dtCreatedAt = DateTime::createFromFormat($timestampFormat, $createdAt);
-
-            if (!$dtCreatedAt)
-                throw new \RuntimeException("An attempt to set createdAt was made for class " . self::class . ", but the given string didn't follow the proper timestamp format ($createdAt)");
-
-            $this->createdAt = $createdAt;
-        } else {
+        if (!$createdAt)
             $this->createdAt = null;
-        }
+
+        $timestampFormat = config('baker.timestamp_format');
+
+        $dtCreatedAt = DateTime::createFromFormat($timestampFormat, $createdAt);
+
+        if (!$dtCreatedAt)
+            throw new \RuntimeException("An attempt to set createdAt was made for class " . self::class . ", but the given string didn't follow the proper timestamp format ($createdAt)");
+
+        $this->createdAt = $createdAt;
     }
 
     public function getCreatedAt(): ?string

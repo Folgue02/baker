@@ -62,8 +62,9 @@ class BackupCommand extends Command
         try {
             $backupFilepath = $this->backupService->backupFile($selectedVault, $settings, $filepath);
             $relOgFilepath = StrUtilities::relativePathTo($selectedVault->originRoot, $filepath);
+            $relBakFilepath = substr($backupFilepath, strlen($selectedVault->targetRoot));
 
-            $this->vaultService->logNewBackup($selectedVault, $relOgFilepath, $backupFilepath);
+            $this->vaultService->logNewBackup($selectedVault, $relOgFilepath, $relBakFilepath);
         } catch (\Exception $e) {
             $this->error("Couldn't backup file '$filepath': " . $e->getMessage());
             return;

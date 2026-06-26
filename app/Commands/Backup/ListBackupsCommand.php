@@ -1,6 +1,7 @@
 <?php
 namespace App\Commands\Backup;
 
+use App\Models\Vault\BackupEntry;
 use App\Services\BackupService;
 use App\Services\ConfigService;
 use App\Services\VaultService;
@@ -56,10 +57,39 @@ class ListBackupsCommand extends Command
 
         $originalFilepath = StrUtilities::canonicalPath($this->argument('filepath'));
         $selectedVault = $config->getVault();
-        $settings = $config->getSettings($selectedVault->name);
 
         $manifest = $this->vaultService->fetchOrInitializeManifest($selectedVault);
         $relOgFilepath = StrUtilities::relativePathTo($selectedVault->originRoot, $originalFilepath);
+
+        if (!$relOgFilepath) {
+            $this->error("The specified file doesn't seem related to the vault ($originalFilepath).");
+            return;
+        }
+
+        $backupGroup = array_find($manifest->backups, fn($backup) => $backup->filepath === $relOgFilepath) ?? [];
+
+        if (empty($backupGroup))
+            $this->warn("No backups found for '$relOgFilepath'");
+        else {
+            $tableHeaders = ['Created at', 'Backup filepath', 'Exists?'];
+
+            $tableContents = array_map(
+                function (BackupEntry $backupEntry) use ($selectedVault)
+                {
+                    $existsTag = file_exists(rtrim($selectedVault->targetRoot, '/') . $backupEntry->backupPath)
+                        ? '<fg=green>Yes</>'
+                        : '<fg=red>No</>';
+
+                    return [$backupEntry->createdAt, $backupEntry->backupPath, $existsTag];
+                },
+                $backupGroup->backups
+            );
+
+            $this->table(
+                $tableHeaders,
+                $tableContents
+            );
+        }
     }
 
     /**
