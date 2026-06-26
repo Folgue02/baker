@@ -4,6 +4,8 @@ namespace App\Commands;
 
 use App\Services\BackupService;
 use App\Services\ConfigService;
+use App\Services\VaultService;
+use App\Utilities\StrUtilities;
 use Illuminate\Console\Scheduling\Schedule;
 use LaravelZero\Framework\Commands\Command;
 
@@ -25,7 +27,8 @@ class BackupCommand extends Command
 
     public function __construct(
         public ConfigService $configService,
-        public BackupService $backupService
+        public BackupService $backupService,
+        public VaultService $vaultService
     ) {
         parent::__construct();
     }
@@ -52,18 +55,21 @@ class BackupCommand extends Command
             return;
         }
 
-        $filepath = $this->argument('filepath');
+        $filepath = StrUtilities::canonicalPath($this->argument('filepath'));
         $selectedVault = $config->getVault();
         $settings = $config->getSettings($selectedVault->name);
 
-
         try {
-            $targetFilepath = $this->backupService->backupFile($selectedVault, $settings, $filepath);
+            $backupFilepath = $this->backupService->backupFile($selectedVault, $settings, $filepath);
+            $relOgFilepath = StrUtilities::relativePathTo($selectedVault->originRoot, $filepath);
+
+            $this->vaultService->logNewBackup($selectedVault, $relOgFilepath, $backupFilepath);
         } catch (\Exception $e) {
             $this->error("Couldn't backup file '$filepath': " . $e->getMessage());
             return;
         }
-        $this->line("File backed up: <info>$filepath</info> -> <info>$targetFilepath</info>");
+
+        $this->line("File backed up: <info>$filepath</info> -> <info>$backupFilepath</info>");
     }
 
     /**

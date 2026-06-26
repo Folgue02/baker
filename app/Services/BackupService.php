@@ -25,12 +25,8 @@ class BackupService implements IBackupService
         return $targetFilepath;
     }
 
-    public function listBackups(Vault $vault, Settings $settings, string $filepath): array
+    public function listBackups(Vault $vault, string $filepath): array
     {
-        $realFilepath = realpath($filepath);
-        if ($realFilepath === false || !str_starts_with($realFilepath, $vault->originRoot))
-            throw new \RuntimeException("The specified '$filepath' doesn't seem to be part of the vault in use (original root: '{$vault->originRoot}') or doesn't exist.");
-
         return [];
     }
 }

@@ -46,4 +46,17 @@ final class StrUtilities
 
         return '/' . implode('/', $resolvedSegments);
     }
+
+    /**
+     * @param string $path Path to be resolved (must be absolute and canonical).
+     * @param string $base Base path (must be absolute and canonical).
+     * @return ?string The relative version of the given path to the base. If the given path is not related to the
+     * specified base, <code>null</code> is returned.
+     */
+    public static function relativePathTo(string $base, string $path): ?string
+    {
+        $base = self::canonicalPath($base);
+
+        return str_starts_with($path, $base) ? substr($path, strlen($base)) : null;
+    }
 }

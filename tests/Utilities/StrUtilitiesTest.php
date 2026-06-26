@@ -55,4 +55,28 @@ class StrUtilitiesTest extends TestCase
 
         $this->assertEquals($expected, $result);
     }
+
+    public function testRelativePathTo_onlyFile(): void
+    {
+        $expected = '/file.php';
+        $result = StrUtilities::relativePathTo('/Users/folgue02/app', '/Users/folgue02/app/file.php');
+
+        $this->assertEquals($expected, $result);
+    }
+
+    public function testRelativePathTo_fileInSubdir(): void
+    {
+        $expected = '/calendar/listing.php';
+        $result = StrUtilities::relativePathTo('/Users/folgue02/app', '/Users/folgue02/app/calendar/listing.php');
+
+        $this->assertEquals($expected, $result);
+    }
+
+    public function testRelativePathTo_unrelatedPath(): void
+    {
+        $expected = null;
+        $result = StrUtilities::relativePathTo('/Users/folgue02/app', '/Users/folgue02/Documents/calendar/listing.php');
+
+        $this->assertEquals($expected, $result);
+    }
 }
