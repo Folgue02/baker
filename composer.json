@@ -12,6 +12,15 @@
     "scripts": {
         "test": [
             "php vendor/bin/phpunit tests"
+        ],
+        "phar": [
+            "php baker app:build baker.php"
+        ],
+        "bin": [
+            "./vendor/bin/phpacker build --src=./builds/baker.php --php=8.5 all"
+        ],
+        "clean-builds": [
+            "rm -r builds/*"
         ]
     },
     "authors": [
@@ -28,6 +37,7 @@
     "require-dev": {
         "laravel/pint": "^1.25.1",
         "mockery/mockery": "^1.6.12",
+        "phpacker/phpacker": "^0.6.4",
         "phpunit/phpunit": "^12.5"
     },
     "autoload": {
