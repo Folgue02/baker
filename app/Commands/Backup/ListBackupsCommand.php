@@ -1,19 +1,21 @@
 <?php
 namespace App\Commands\Backup;
 
+use App\Commands\ValidatableCommand;
+use App\Models\Config\BakerConfiguration;
 use App\Models\Vault\BackupEntry;
-use App\Services\BackupService;
+use App\Models\Vault\VaultManifest;
 use App\Services\ConfigService;
 use App\Services\VaultService;
 use App\Utilities\StrUtilities;
+use App\Validation\ValidationLog;
+use DateTime;
 use Illuminate\Console\Scheduling\Schedule;
-use LaravelZero\Framework\Commands\Command;
 
-class ListBackupsCommand extends Command
+class ListBackupsCommand extends ValidatableCommand
 {
     public function __construct(
         private ConfigService $configService,
-        private BackupService $backupService,
         private VaultService $vaultService
     ) {
         parent::__construct();
@@ -24,7 +26,11 @@ class ListBackupsCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'backup:list {filepath : Path of the file to look for in the target vault.}';
+    protected $signature = 'backup:list
+        {filepath    : Path of the file to look for in the target vault.}
+        {--s|since=  : Backup entries shown in the listing must be later than this.}
+        {--u|until=  : Backup entries shown in the listing must be earlier than this.}
+        {--e|exists= : Only shows entries of backups that exist.}';
 
     /**
      * The console command description.
@@ -33,43 +39,112 @@ class ListBackupsCommand extends Command
      */
     protected $description = 'Lists the backups created for the specified file.';
 
+    private ?DateTime $since = null;
+    private ?DateTime $until = null;
+    private ?bool $exists = null;
+    private string $filepath;
+    private string $ogVaultFilepath;
+    private ?BakerConfiguration $bakerConfig = null;
+    private ?VaultManifest $manifest = null;
+
+    #[\Override]
+    protected function initializeCommand(): ValidationLog
+    {
+        $validationLog = new ValidationLog;
+
+        // ==== Read configuration
+        $validationLog->startSection('Read configuration');
+        try {
+            $this->bakerConfig = $this->configService->readConfiguration();
+        } catch (\Exception $e) {
+            return $validationLog->registerError("Couldn't read configuration file: \n{$e->getMessage()}");
+        }
+
+        if (!$validationLog->validate($this->bakerConfig))
+            return $validationLog;
+
+        $selectedVault = $this->bakerConfig->getVault();
+
+        try {
+            $this->manifest = $this->vaultService->fetchOrInitializeManifest($selectedVault);
+        } catch (\Exception $e) {
+            $validationLog->registerError("Couldn't fetch/initialize the target vault manifest file.");
+        }
+
+        // Validate arguments
+        $validationLog->startSection('Argument validation');
+
+        $dateFormat = config('baker.date_format');
+        $dateTimeFormat = config('baker.timestamp_format');
+        $filepath = $this->argument('filepath');
+        $since = $this->option('since');
+        $until = $this->option('until');
+        $exists = $this->option('exists');
+        $this->exists = $this->option('exists');
+
+        if ($since) {
+            $since = DateTime::createFromFormat($dateTimeFormat, $since) ?: DateTime::createFromFormat($dateFormat, $since);
+
+            if (!$since)
+                $validationLog->registerError("The --since flag doesn't follow the valid datetime/date format (expected: $dateFormat/$dateTimeFormat)");
+            else
+                $this->since = $since;
+
+        }
+
+        if ($until) {
+            $until = DateTime::createFromFormat($dateTimeFormat, $until) ?: DateTime::createFromFormat($dateFormat, $until);
+
+            if (!$until)
+                $validationLog->registerError("The --until flag doesn't follow the valid datetime/date format (expected: $dateFormat/$dateTimeFormat)");
+            else
+                $this->until = $until;
+        }
+
+        if ($exists) {
+            $exists = match (strtolower($exists)) {
+                'yes', 'true', null => true,
+                'no', 'false' => false,
+                default => null
+            };
+
+            if (is_null($exists)) {
+                $validationLog->registerError("Invalid value specified for 'exists', only yes/true or no/false are valid");
+            }
+
+            $this->exists = $exists;
+        }
+
+        $this->filepath = StrUtilities::canonicalPath($filepath);
+        $ogVaultFilepath = StrUtilities::relativePathTo($selectedVault->originRoot, $this->filepath);
+
+        if (!$ogVaultFilepath ) {
+            $validationLog->registerError("The specified file doesn't seem related to the vault ($this->filepath).");
+        } else {
+            $this->ogVaultFilepath = $ogVaultFilepath;
+        }
+
+        return $validationLog;
+    }
+
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        try {
-            $config = $this->configService->readConfiguration();
-        } catch (\Exception $e) {
-            $this->error("Couldn't read configuration file: \n{$e->getMessage()}");
-            return;
-        }
-
-        $errors = $config->validateConfig();
-
-        if (!empty($errors)) {
-            $this->error("The configuration is considered invalid due to the following reasons: ");
-            foreach ($errors as $error)
-                $this->error("\t - {$error->value}");
-
-            return;
-        }
-
-        $originalFilepath = StrUtilities::canonicalPath($this->argument('filepath'));
-        $selectedVault = $config->getVault();
-
-        $manifest = $this->vaultService->fetchOrInitializeManifest($selectedVault);
-        $relOgFilepath = StrUtilities::relativePathTo($selectedVault->originRoot, $originalFilepath);
-
-        if (!$relOgFilepath) {
-            $this->error("The specified file doesn't seem related to the vault ($originalFilepath).");
-            return;
-        }
-
-        $backupGroup = array_find($manifest->backups, fn($backup) => $backup->filepath === $relOgFilepath) ?? [];
+        $selectedVault = $this->bakerConfig->getVault();
+        $backupGroup = array_find($this->manifest->backups, fn($backup) => $backup->filepath === $this->ogVaultFilepath) ?? [];
+        $backupEntries = $this->vaultService->listBackups(
+            $selectedVault,
+            $this->ogVaultFilepath,
+            manifest: $this->manifest,
+            since: $this->since,
+            until: $this->until,
+            exists: $this->exists
+        );
 
         if (empty($backupGroup))
-            $this->warn("No backups found for '$relOgFilepath'");
+            $this->warn("No backups found for '$this->ogVaultFilepath'");
         else {
             $tableHeaders = ['Created at', 'Backup filepath', 'Exists?'];
 
@@ -82,7 +157,7 @@ class ListBackupsCommand extends Command
 
                     return [$backupEntry->createdAt, $backupEntry->backupPath, $existsTag];
                 },
-                $backupGroup->backups
+                $backupEntries
             );
 
             $this->table(

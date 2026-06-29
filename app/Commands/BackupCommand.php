@@ -45,12 +45,12 @@ class BackupCommand extends Command
             return;
         }
 
-        $errors = $config->validateConfig();
+        $errors = $config->validate();
 
         if (!empty($errors)) {
             $this->error("The configuration is considered invalid due to the following reasons: ");
             foreach ($errors as $error)
-                $this->error("\t - {$error->value}");
+                $this->error("\t - {$error}");
 
             return;
         }

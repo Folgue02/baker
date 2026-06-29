@@ -6,6 +6,7 @@ use App\Models\Vault\BackupEntry;
 use App\Models\Vault\VaultManifest;
 use App\Utilities\StrUtilities;
 use JsonMapper;
+use DateTime;
 
 final class VaultService
 {
@@ -38,7 +39,7 @@ final class VaultService
      * Stores the manifest as a JSON in the manifest path {@see $this::pathToManifest()}
      *
      * @param Vault $vault The vault's paths determine where the manifest is located at.
-     * @param VaultManifest $vaultManifest The new manifest to store in the file.
+     * @param VaultManifest $manifest The new manifest to store in the file.
      */
     public function storeManifest(Vault $vault, VaultManifest $manifest): void
     {
@@ -66,5 +67,36 @@ final class VaultService
         $backupGroup->backups[] = $backupEntry;
 
         $this->storeManifest($vault, $manifest);
+    }
+
+    /**
+     *
+     * @return BackupEntry[] Filtered backup entries
+     */
+    public function listBackups(
+        Vault $vault,
+        string $filepath,
+        ?VaultManifest $manifest = null,
+        ?DateTime $since = null,
+        ?DateTime $until = null,
+        ?bool $exists = null
+    ): array {
+        $manifest = $manifest ?? $this->fetchOrInitializeManifest($vault);
+
+        $backupGroup = array_find($manifest->backups, fn($backupEntry) => $backupEntry->filepath === $filepath);
+
+        return array_filter(
+            $backupGroup->backups,
+            function(BackupEntry $backupEntry) use ($since, $until, $exists, $vault): bool {
+                $createdAt = $backupEntry->createdAtAsDateTime();
+                $realBackupPath = rtrim($vault->targetRoot, '/')
+                    . '/'
+                    . ltrim($backupEntry->backupPath, '/');
+
+                return (!$since || $since <= $createdAt)
+                    && (!$until || $createdAt <= $until)
+                    && ($exists === null || file_exists($realBackupPath) === $exists);
+            }
+        );
     }
 }

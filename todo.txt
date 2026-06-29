@@ -1,0 +1,4 @@
+x 2026-06-29 2026-06-29 Create list subcommand +cmds
+x 2026-06-29 2026-06-29 Implement validation system +systems
+(A) Adapt the backup command to the new validation system
+(C) Create interactive menu to setup the baker.config.json file

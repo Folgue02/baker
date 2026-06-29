@@ -24,9 +24,4 @@ class BackupService implements IBackupService
 
         return $targetFilepath;
     }
-
-    public function listBackups(Vault $vault, string $filepath): array
-    {
-        return [];
-    }
 }

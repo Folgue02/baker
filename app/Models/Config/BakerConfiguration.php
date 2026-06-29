@@ -2,8 +2,9 @@
 namespace App\Models\Config;
 
 use App\Utilities\StrUtilities;
+use App\Validation\IValidatable;
 
-final class BakerConfiguration
+final class BakerConfiguration implements IValidatable
 {
     public string $selectedVaultName;
 
@@ -14,7 +15,8 @@ final class BakerConfiguration
 
     public ?Settings $globalSettings;
 
-    public function validateConfig(): array
+    #[\Override]
+    public function validate(): array
     {
         $errors = [];
         $selectedVault = $this->getVault($this->selectedVaultName);
@@ -48,6 +50,12 @@ final class BakerConfiguration
         $this->selectedVaultName = StrUtilities::resolveStringVariables($this->selectedVaultName, $envVars);
     }
 
+    /**
+     * @param string $vaultName Name of the vault to retrieve, if not specified,
+     * the `selectedVaultName` is used.
+     * @return ?Vault The selected vault by the `selectedVaultName` property, or
+     * the vault with the name specified.
+     */
     public function getVault(?string $vaultName = null): ?Vault
     {
         $vaultName = $vaultName ?? $this->selectedVaultName;
