@@ -46,7 +46,7 @@ class ValidationLog implements IteratorAggregate
 
     public function closeSection(): void
     {
-        $this->currentSection = null;
+        $this->currentSection = self::UNCATEGORIZED_NAME;
     }
 
     /**

@@ -2,14 +2,17 @@
 
 namespace App\Commands;
 
+use App\Models\Config\BakerConfiguration;
+use App\Models\Config\Vault;
 use App\Services\BackupService;
 use App\Services\ConfigService;
 use App\Services\VaultService;
 use App\Utilities\StrUtilities;
+use App\Validation\ValidationLog;
 use Illuminate\Console\Scheduling\Schedule;
-use LaravelZero\Framework\Commands\Command;
+use Override;
 
-class BackupCommand extends Command
+class BackupCommand extends ValidatableCommand
 {
     /**
      * The name and signature of the console command.
@@ -25,6 +28,10 @@ class BackupCommand extends Command
      */
     protected $description = 'Stores a file in the target root of the selected vault.';
 
+    private BakerConfiguration $bakerConfig;
+    private string $originalFilepath;
+    private Vault $selectedVault;
+
     public function __construct(
         public ConfigService $configService,
         public BackupService $backupService,
@@ -33,31 +40,42 @@ class BackupCommand extends Command
         parent::__construct();
     }
 
-    /**
-     * Execute the console command.
-     */
+    #[Override]
+    protected function initializeCommand(): ValidationLog
+    {
+        $validationLog = new ValidationLog;
+
+        // ==== Read configuration
+        $validationLog->startSection('Read configuration');
+        try {
+            $this->bakerConfig = $this->configService->readConfiguration();
+        } catch (\Exception $e) {
+            return $validationLog->registerError("Couldn't read configuration file: \n{$e->getMessage()}");
+        }
+
+        if (!$validationLog->validate($this->bakerConfig))
+            return $validationLog;
+
+        $this->selectedVault = $this->bakerConfig->getVault();
+
+        // Parse arguments
+        $validationLog->closeSection();
+        $this->originalFilepath = StrUtilities::canonicalPath($this->argument('filepath'));
+
+        if (!file_exists($this->originalFilepath))
+            $validationLog->registerError("The specified file ($this->originalFilepath) doesn't exist or couldn't be found.");
+
+        if (!str_starts_with($this->originalFilepath, $this->selectedVault->originRoot))
+            $validationLog->registerError("The specified file ($this->originalFilepath) doesn't belong to the root of the original vault ({$this->selectedVault->originRoot})");
+
+        return $validationLog;
+    }
+
     public function handle(): void
     {
-        try {
-            $config = $this->configService->readConfiguration();
-        } catch (\Exception $e) {
-            $this->error("Couldn't read configuration file: \n{$e->getMessage()}");
-            return;
-        }
-
-        $errors = $config->validate();
-
-        if (!empty($errors)) {
-            $this->error("The configuration is considered invalid due to the following reasons: ");
-            foreach ($errors as $error)
-                $this->error("\t - {$error}");
-
-            return;
-        }
-
         $filepath = StrUtilities::canonicalPath($this->argument('filepath'));
-        $selectedVault = $config->getVault();
-        $settings = $config->getSettings($selectedVault->name);
+        $selectedVault = $this->bakerConfig->getVault();
+        $settings = $this->bakerConfig->getSettings($selectedVault->name);
 
         try {
             $backupFilepath = $this->backupService->backupFile($selectedVault, $settings, $filepath);
@@ -73,9 +91,6 @@ class BackupCommand extends Command
         $this->line("File backed up: <info>$filepath</info> -> <info>$backupFilepath</info>");
     }
 
-    /**
-     * Define the command's schedule.
-     */
     public function schedule(Schedule $schedule): void
     {
         // $schedule->command(static::class)->everyMinute();

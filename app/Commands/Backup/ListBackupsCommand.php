@@ -30,7 +30,7 @@ class ListBackupsCommand extends ValidatableCommand
         {filepath    : Path of the file to look for in the target vault.}
         {--s|since=  : Backup entries shown in the listing must be later than this.}
         {--u|until=  : Backup entries shown in the listing must be earlier than this.}
-        {--e|exists= : Only shows entries of backups that exist.}';
+        {--e|exists= : Only shows entries of backups that exist (values: yes/true or no/false).}';
 
     /**
      * The console command description.

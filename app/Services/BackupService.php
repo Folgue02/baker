@@ -6,8 +6,14 @@ use App\Models\Config\Settings;
 use App\Models\Config\Vault;
 use App\Utilities\StrUtilities;
 
+/**
+ * Service class to manage file backups.
+ */
 class BackupService implements IBackupService
 {
+    /**
+     * Creates a backup of the specified file in the root of the target vault given.
+     */
     public function backupFile(Vault $vault, Settings $settings, string $filepath): string
     {
         $realFilepath = realpath($filepath);
