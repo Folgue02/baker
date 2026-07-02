@@ -1,28 +1,42 @@
 <?php
 namespace App\Commands\Config;
 
+use App\Commands\ValidatableCommand;
+use App\Models\Config\BakerConfiguration;
 use App\Services\ConfigService;
+use App\Validation\ValidationLog;
 use Illuminate\Console\Scheduling\Schedule;
 use LaravelZero\Framework\Commands\Command;
+use Override;
 
-class DisplayCommand extends Command
+class DisplayCommand extends ValidatableCommand
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'config:display';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Displays the current baker configuration in the system.';
+
+    private BakerConfiguration $bakerConfig;
 
     public function __construct(public ConfigService $configService) {
         parent::__construct();
+    }
+
+    #[Override]
+    protected function initializeCommand(): ValidationLog
+    {
+        $validationLog = new ValidationLog;
+
+        // Read configuration
+        $validationLog->startSection('Read configuration');
+        try {
+            $this->bakerConfig = $this->configService->readConfiguration();
+        } catch (\Exception $e) {
+            return $validationLog->registerError("Couldn't read configuration file: {$e->getMessage()}");
+        }
+
+        $validationLog->startSection('Validate configuration');
+        $validationLog->validate($this->bakerConfig);
+
+        return $validationLog;
     }
 
     /**
@@ -30,43 +44,27 @@ class DisplayCommand extends Command
      */
     public function handle()
     {
-        try {
-            $config = $this->configService->readConfiguration();
-        } catch (\Exception $e) {
-            $this->error("Couldn't read configuration file: \n{$e->getMessage()}");
-            return;
-        }
-
-        $errors = $config->validateConfig();
-        if (!empty($errors)) {
-            $this->error("The configuration is considered invalid due to the following reasons: ");
-            foreach ($errors as $error) {
-                $this->error("\t - {$error->value}");
-            }
-            return;
-        }
-
-        $this->line("=- VAULTS (" . count($config->vaults) . ") -= ");
-        foreach ($config->vaults as $vault) {
-            $this->line("\t- {$vault->name}" . ($vault->name === $config->selectedVaultName ? ' ✅' : ''));
+        $this->line("=- VAULTS (" . count($this->bakerConfig->vaults) . ") -= ");
+        foreach ($this->bakerConfig->vaults as $vault) {
+            $this->line("\t- {$vault->name}" . ($vault->name === $this->bakerConfig->selectedVaultName ? ' ✅' : ''));
             $this->line("\t\t({$vault->originRoot}) -> ({$vault->targetRoot})");
         }
 
-        if ($config->globalSettings) {
+        if ($this->bakerConfig->globalSettings) {
             $this->line('');
             $this->line("=- GLOBAL SETTINGS -=");
-            $this->line("\t- Backup suffix: {$config->globalSettings->backupSuffix}");
+            $this->line("\t- Backup suffix: {$this->bakerConfig->globalSettings->backupSuffix}");
             $this->line('');
         }
 
-        $selectedVault = $config->getVault();
+        $selectedVault = $this->bakerConfig->getVault();
         // Display selected vault's config
         $this->line("=- VAULT IN USE -=");
         $this->line("\tVAULT: " . $selectedVault->name);
-        $this->line("\t\t({$vault->originRoot}) -> ({$vault->targetRoot})");
+        $this->line("\t\t({$selectedVault->originRoot}) -> ({$selectedVault->targetRoot})");
         $this->line('');
 
-        $settings = $config->getSettings();
+        $settings = $this->bakerConfig->getSettings();
         if ($selectedVault->settings)
             $this->line("\tVAULT SETTINGS IN USE");
         else
